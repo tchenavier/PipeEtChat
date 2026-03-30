@@ -1,3 +1,9 @@
+import { SocketAddress } from 'net';
+import { WebSocketServer } from 'ws';
+import express from 'express';
+import path from 'path';
+
+const __dirname = path.resolve();
 const express = require('express'); // var expresse prend expresse pour le http
 const app = express(); // instasie expresse
 const mysql = require('mysql2');
@@ -10,7 +16,7 @@ const Utilisateur = process.env.Utilisateur;
 const Mot_Passe = process.env.Mot_Passe;
 const Table = process.env.Table;
 const Adresse = process.env.Adresse;
-
+//Express
 const connection = mysql.createConnection({
     host: Adresse,//localhost si votre node est sur la même VM que votre Bdd
     user: Utilisateur,//non utilisateur
@@ -134,7 +140,58 @@ app.post('/connexion', (req, res) => {
 
 });
 
+app.post('/message', (req, res) => {
+
+    connection.query('SELECT id,login FROM utilisateur WHERE login = ? AND pasword = ?', [login, pasword], (err, results) => {//Pour ne renvoyer que l'id le login et l'id du role
+                if (err) {
+                    console.error('Erreur lors de la vérification des identifiants :', err);
+                    res.status(500).json({ message: 'Erreur serveur' });
+                    return;
+                }
+                if (results.length === 0) {
+                    res.status(401).json({ message: 'Identifiants invalides' });
+                    return;
+                }
+
+                res.status(200).json({ message: '' });
+                    return;
+            });
+});
 
 app.listen(9000, () => { //express écoute sur le port 3000 et affiche un message dans la console
     console.log('server runing')
 });  //Le poind virgule c'est juste pour dire la fin de la fonction
+
+//Web Socket Server
+
+const server = new WebSocketServer({
+    port: 9001
+});
+
+var clients = [];
+
+server.on('connection', (socket) => {
+    console.log('Clien connected');
+    clients.push(socket);
+
+    socket.on('message', (message) => {
+        console.log('Received : ${message}');
+
+        for(var i=0;i< clients.length;i++)
+        {
+            clients[i].send('Server: ${message}');
+        }
+        //socket.send('Server: ${message}');
+    });
+
+    //Retire le socket du tableau de clients
+    socket.on('close', () => {
+        console.log('Client disconnected');
+        var index = clients.indexOf(socket);
+        if (index !== -1) {
+            clients.splice(index, 1);
+        }
+    });
+
+});
+
