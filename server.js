@@ -1,22 +1,19 @@
-import { SocketAddress } from 'net';
-import { WebSocketServer } from 'ws';
-import express from 'express';
-import path from 'path';
-
-const __dirname = path.resolve();
+// Importations
+const { WebSocketServer } = require('ws');
 const express = require('express'); // var expresse prend expresse pour le http
-const app = express(); // instasie expresse
 const mysql = require('mysql2');
 const path = require('path');//fournit des utilitaires pour travailler avec les chemins de fichiers et de répertoires
-const { BroadcastChannel } = require('worker_threads');
-
 require('dotenv').config();
 
+const app = express(); // instasie expresse
+
+// Configuration Variables d'environnement
 const Utilisateur = process.env.Utilisateur;
 const Mot_Passe = process.env.Mot_Passe;
 const Table = process.env.Table;
 const Adresse = process.env.Adresse;
-//Express
+
+// Connexion MySQL
 const connection = mysql.createConnection({
     host: Adresse,//localhost si votre node est sur la même VM que votre Bdd
     user: Utilisateur,//non utilisateur
@@ -32,6 +29,7 @@ connection.connect((err) => {
     console.log('Connecté à la base de données MySQL.');
 });
 
+// Middleware
 app.use(express.static('public'));
 app.use(express.json());
 
@@ -126,13 +124,6 @@ app.post('/connexion', (req, res) => {
                 // Identifiants valides 
                 //renvoi les informations du user
                 res.status(202).json({ user: results[0] });
-                const filePath = path.join(__dirname, 'public', 'visualNovel.html');//envois la page du jeu
-                // __dirname: répertoire du fichier JS actuel
-                /* res.sendFile(filePath, (err) => {
-                     if (err) {
-                         console.error('Erreur d envoi du fichier:', err);
-                     }
-                 });*/
             });
         }
     }
@@ -174,12 +165,14 @@ server.on('connection', (socket) => {
     console.log('Clien connected');
     clients.push(socket);
 
-    socket.on('message', (message) => {
-        console.log('Received : ${message}');
+    socket.on('message', (data) => {
+        // En WS moderne, 'data' est un Buffer, il faut le convertir en string
+        const message = data.toString();
+        console.log(`Reçu : ${message}`);
 
         for(var i=0;i< clients.length;i++)
         {
-            clients[i].send('Server: ${message}');
+            clients[i].send(`Serveur : ${message}`);
         }
         //socket.send('Server: ${message}');
     });
