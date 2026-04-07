@@ -132,26 +132,73 @@ app.post('/connexion', (req, res) => {
 });
 
 app.post('/message', (req, res) => {
-
-    connection.query('SELECT id,login FROM utilisateur WHERE login = ? AND pasword = ?', [login, pasword], (err, results) => {//Pour ne renvoyer que l'id le login et l'id du role
+    const { login, pasword, message, idSalon } = req.body;
+    connection.query('SELECT id,login,idSalon FROM utilisateur,AssociationSalon WHERE login = ? AND pasword = ?', [login, pasword], (err, results) => {
+        if (err) {
+            console.error('Erreur lors de la vérification des identifiants :', err);
+            res.status(500).json({ message: 'Erreur serveur' });
+            return;
+        }
+        else if (results.length === 0) {
+            res.status(401).json({ message: 'Identifiants invalides' });
+            return;
+        }
+        else {
+            connection.query('INSERT INTO Message (`idSalon`, `idUtilisateur`, `text`) VALUES (?,?,?)', [idSalon, results[0].id, message], (err, results) => {
                 if (err) {
-                    console.error('Erreur lors de la vérification des identifiants :', err);
+                    console.error('Erreur lors de l\'insertion du message dans la base de données :', err);
                     res.status(500).json({ message: 'Erreur serveur' });
                     return;
                 }
-                if (results.length === 0) {
+                else if (results.length === 0) {
                     res.status(401).json({ message: 'Identifiants invalides' });
                     return;
                 }
-
-                res.status(200).json({ message: '' });
-                    return;
+                else {
+                    console.log('Message inséré avec succès, ID du message :', results.insertId);
+                    connection.query('INSERT INTO AssociationMessage (idSalon, idMessage) VALUES (?,?)', [idSalon, results.insertId], (err, results) => {
+                        if (err) {
+                            console.error('Erreur lors de l\'association du message au salon dans la base de données :', err);
+                            res.status(500).json({ message: 'Erreur serveur' });
+                            return;
+                        }
+                        else if (results.length === 0) {
+                            res.status(401).json({ message: 'Identifiants invalides' });
+                            return;
+                        }
+                        else {
+                            res.status(200).json({ message: 'Message envoyé !' });
+                            return;
+                        }
+                    });
+                }
             });
+        }
+    });
+});
+
+app.post('/pull-message', (req, res) => {
+
+    connection.query('SELECT id,login FROM utilisateur WHERE login = ? AND pasword = ?', [login, pasword], (err, results) => {
+        if (err) {
+            console.error('Erreur lors de la vérification des identifiants :', err);
+            res.status(500).json({ message: 'Erreur serveur' });
+            return;
+        }
+        if (results.length === 0) {
+            res.status(401).json({ message: 'Identifiants invalides' });
+            return;
+        }
+
+        res.status(200).json({ message: '' });
+        return;
+    });
 });
 
 app.listen(9000, () => { //express écoute sur le port 3000 et affiche un message dans la console
     console.log('server runing')
 });  //Le poind virgule c'est juste pour dire la fin de la fonction
+
 
 //Web Socket Server
 
@@ -170,12 +217,25 @@ server.on('connection', (socket) => {
         const message = data.toString();
         console.log(`Reçu : ${message}`);
 
-        for(var i=0;i< clients.length;i++)
-        {
+        for (var i = 0; i < clients.length; i++) {
             clients[i].send(`Serveur : ${message}`);
         }
         //socket.send('Server: ${message}');
     });
+
+    socket.on('rejoindre-Salon', (salondID) => {
+        console.log(`Client ${socket.id} a rejoint le salon : ${salondID.nom}`);
+        socket.join(salondID); // Rejoindre le salon
+        socket.emit('salon-rejoint', `Vous avez rejoint le salon : ${salondID.nom}`); // Confirmer au client qu'il a rejoint le salon
+        socket.to(salondID).emit('message', `${socket.nom} a rejoint le salon : ${salondID.nom}`); // Informer les autres membres du salon
+    })
+
+    socket.on('quiter-salon', (data) => {
+        console.log(`Client ${socket.id} a quitté le salon : ${salondID.nom}`);
+        socket.leave(salondID); // Quitter le salon
+        socket.emit('salon-quitte', `Vous avez quitté le salon : ${salondID.nom}`); // Confirmer au client qu'il a quitté le salon
+        socket.to(salondID).emit('message', `${socket.nom} a quitté le salon : ${salondID.nom}`); // Informer les autres membres du salon
+    })
 
     //Retire le socket du tableau de clients
     socket.on('close', () => {
