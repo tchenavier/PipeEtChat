@@ -178,20 +178,31 @@ app.post('/message', (req, res) => {
 });
 
 app.post('/pull-message', (req, res) => {
-
+    const { login, pasword, message, idSalon } = req.body;
     connection.query('SELECT id,login FROM utilisateur WHERE login = ? AND pasword = ?', [login, pasword], (err, results) => {
         if (err) {
             console.error('Erreur lors de la vérification des identifiants :', err);
             res.status(500).json({ message: 'Erreur serveur' });
             return;
         }
-        if (results.length === 0) {
+        else if (results.length === 0) {
             res.status(401).json({ message: 'Identifiants invalides' });
             return;
+        } else {
+            connection.query('SELECT text FROM Message,AssosiationMessage WHERE idSalon = ? AND idMessage = Message.id', [idSalon], (err, results) => {
+                if (err) {
+                    console.error('Erreur lors de la récupération des messages :', err);
+                    res.status(500).json({ message: 'Erreur serveur' });
+                    return;
+                } else if (results.length === 0) {
+                    res.status(401).json({ message: 'Identifiants invalides' });
+                    return;
+                } else {
+                    res.status(200).json({ messages: results });
+                    return;
+                }
+            });
         }
-
-        res.status(200).json({ message: '' });
-        return;
     });
 });
 
