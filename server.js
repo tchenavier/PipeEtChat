@@ -4,6 +4,7 @@ const express = require('express'); // var expresse prend expresse pour le http
 const mysql = require('mysql2');
 const path = require('path');//fournit des utilitaires pour travailler avec les chemins de fichiers et de répertoires
 require('dotenv').config();
+const bcrypt  = require('bcrypt');
 
 const app = express(); // instasie expresse
 
@@ -12,6 +13,7 @@ const Utilisateur = process.env.Utilisateur;
 const Mot_Passe = process.env.Mot_Passe;
 const Table = process.env.Table;
 const Adresse = process.env.Adresse;
+const ValeurHash = process.env.ValeurHash;
 
 // Connexion MySQL
 const connection = mysql.createConnection({
@@ -65,9 +67,10 @@ app.post('/register', (req, res) => { //enregistrement des utilisateur
                     return;
                 }
                 else {
+                    const hashedPassword = bcrypt.hashSync(pasword, parseInt(ValeurHash)); // Hash du mot de passe avec bcrypt
                     connection.query( //sert a envoyer les donner au serveur
                         'INSERT INTO utilisateur (`login`, `pasword`) VALUES (?,?)',
-                        [login, pasword],
+                        [login, hashedPassword],
                         (err, results) => {
                             if (err) {
                                 console.error('Erreur lors de l\'insertion dans la base de données :', err);
@@ -94,7 +97,7 @@ app.post('/connexion', (req, res) => {
     console.log(req.body);
     //on récupère le login et le password
     const { login, pasword } = req.body;
-
+    const hashedPassword = bcrypt.hashSync(pasword, parseInt(ValeurHash)); // Hash du mot de passe avec bcrypt
     if (typeof login !== 'string' || typeof pasword !== 'string') {
         return res.status(400).json({ error: 'La saisie doit être une chaîne de caractères.' });
     }
@@ -111,7 +114,7 @@ app.post('/connexion', (req, res) => {
             return res.status(400).json({ error: '' });
         }
         else {
-            connection.query('SELECT id,login FROM utilisateur WHERE login = ? AND pasword = ?', [login, pasword], (err, results) => {//Pour ne renvoyer que l'id le login et l'id du role
+            connection.query('SELECT id,login FROM utilisateur WHERE login = ? AND pasword = ?', [login, hashedPassword], (err, results) => {//Pour ne renvoyer que l'id le login et l'id du role
                 if (err) {
                     console.error('Erreur lors de la vérification des identifiants :', err);
                     res.status(500).json({ message: 'Erreur serveur' });
@@ -127,13 +130,12 @@ app.post('/connexion', (req, res) => {
             });
         }
     }
-
-
 });
 
 app.post('/message', (req, res) => {
     const { login, pasword, message, idSalon } = req.body;
-    connection.query('SELECT id,login,idSalon FROM utilisateur,AssociationSalon WHERE login = ? AND pasword = ?', [login, pasword], (err, results) => {
+    const hashedPassword = bcrypt.hashSync(pasword, parseInt(ValeurHash)); // Hash du mot de passe avec bcrypt
+    connection.query('SELECT id,login,idSalon FROM utilisateur,AssociationSalon WHERE login = ? AND pasword = ?', [login, hashedPassword], (err, results) => {
         if (err) {
             console.error('Erreur lors de la vérification des identifiants :', err);
             res.status(500).json({ message: 'Erreur serveur' });
