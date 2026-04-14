@@ -56,7 +56,7 @@ app.post('/register', (req, res) => { //enregistrement des utilisateur
             return res.status(400).json({ error: '' });
         }
         else {
-            connection.query('SELECT id,login FROM utilisateur WHERE login = ? ', [login], (err, results) => {//Pour ne renvoyer que l'id le login et l'id du role
+            connection.query('SELECT id,login FROM User WHERE login = ? ', [login], (err, results) => {//Pour ne renvoyer que l'id le login et l'id du role
                 if (err) {
                     console.error('Erreur lors de la vérification des identifiants :', err);
                     res.status(500).json({ message: 'Erreur serveur' });
@@ -69,7 +69,7 @@ app.post('/register', (req, res) => { //enregistrement des utilisateur
                 else {
                     const hashedPassword = bcrypt.hashSync(pasword, parseInt(ValeurHash)); // Hash du mot de passe avec bcrypt
                     connection.query( //sert a envoyer les donner au serveur
-                        'INSERT INTO utilisateur (`login`, `pasword`) VALUES (?,?)',
+                        'INSERT INTO User (`login`, `pasword`) VALUES (?,?)',
                         [login, hashedPassword],
                         (err, results) => {
                             if (err) {
@@ -114,7 +114,7 @@ app.post('/connexion', (req, res) => {
             return res.status(400).json({ error: '' });
         }
         else {
-            connection.query('SELECT id,login FROM utilisateur WHERE login = ? AND pasword = ?', [login, hashedPassword], (err, results) => {//Pour ne renvoyer que l'id le login et l'id du role
+            connection.query('SELECT id,login FROM User WHERE login = ? AND pasword = ?', [login, hashedPassword], (err, results) => {//Pour ne renvoyer que l'id le login et l'id du role
                 if (err) {
                     console.error('Erreur lors de la vérification des identifiants :', err);
                     res.status(500).json({ message: 'Erreur serveur' });
@@ -135,7 +135,7 @@ app.post('/connexion', (req, res) => {
 app.post('/message', (req, res) => {
     const { login, pasword, message, idSalon } = req.body;
     const hashedPassword = bcrypt.hashSync(pasword, parseInt(ValeurHash)); // Hash du mot de passe avec bcrypt
-    connection.query('SELECT id,login,idSalon FROM utilisateur,AssociationSalon WHERE login = ? AND pasword = ?', [login, hashedPassword], (err, results) => {
+    connection.query('SELECT id,login,idSalon FROM User,AssociationSalon WHERE login = ? AND pasword = ?', [login, hashedPassword], (err, results) => {
         if (err) {
             console.error('Erreur lors de la vérification des identifiants :', err);
             res.status(500).json({ message: 'Erreur serveur' });
@@ -146,7 +146,7 @@ app.post('/message', (req, res) => {
             return;
         }
         else {
-            connection.query('INSERT INTO Message (`idSalon`, `idUtilisateur`, `text`) VALUES (?,?,?)', [idSalon, results[0].id, message], (err, results) => {
+            connection.query('INSERT INTO Message (`idSalon`, `idUser`, `text`) VALUES (?,?,?)', [idSalon, results[0].id, message], (err, results) => {
                 if (err) {
                     console.error('Erreur lors de l\'insertion du message dans la base de données :', err);
                     res.status(500).json({ message: 'Erreur serveur' });
@@ -158,21 +158,8 @@ app.post('/message', (req, res) => {
                 }
                 else {
                     console.log('Message inséré avec succès, ID du message :', results.insertId);
-                    connection.query('INSERT INTO AssociationMessage (idSalon, idMessage) VALUES (?,?)', [idSalon, results.insertId], (err, results) => {
-                        if (err) {
-                            console.error('Erreur lors de l\'association du message au salon dans la base de données :', err);
-                            res.status(500).json({ message: 'Erreur serveur' });
-                            return;
-                        }
-                        else if (results.length === 0) {
-                            res.status(401).json({ message: 'Identifiants invalides' });
-                            return;
-                        }
-                        else {
-                            res.status(200).json({ message: 'Message envoyé !' });
-                            return;
-                        }
-                    });
+                    res.status(200).json({ message: 'Message envoyé !', messageId: results.insertId });
+                    return;
                 }
             });
         }
@@ -181,7 +168,7 @@ app.post('/message', (req, res) => {
 
 app.post('/pull-message', (req, res) => {
     const { login, pasword, message, idSalon } = req.body;
-    connection.query('SELECT id,login FROM utilisateur WHERE login = ? AND pasword = ?', [login, pasword], (err, results) => {
+    connection.query('SELECT id,login FROM User WHERE login = ? AND pasword = ?', [login, pasword], (err, results) => {
         if (err) {
             console.error('Erreur lors de la vérification des identifiants :', err);
             res.status(500).json({ message: 'Erreur serveur' });
@@ -191,7 +178,7 @@ app.post('/pull-message', (req, res) => {
             res.status(401).json({ message: 'Identifiants invalides' });
             return;
         } else {
-            connection.query('SELECT text FROM Message,AssosiationMessage WHERE idSalon = ? AND idMessage = Message.id', [idSalon], (err, results) => {
+            connection.query('SELECT text FROM Message WHERE idSalon = ?', [idSalon], (err, results) => {
                 if (err) {
                     console.error('Erreur lors de la récupération des messages :', err);
                     res.status(500).json({ message: 'Erreur serveur' });
