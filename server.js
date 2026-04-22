@@ -4,7 +4,7 @@ const express = require('express'); // var expresse prend expresse pour le http
 const mysql = require('mysql2');
 const path = require('path');//fournit des utilitaires pour travailler avec les chemins de fichiers et de répertoires
 require('dotenv').config();
-const bcrypt  = require('bcrypt');
+const bcrypt = require('bcrypt');
 
 const app = express(); // instasie expresse
 
@@ -132,7 +132,7 @@ app.post('/connexion', (req, res) => {
     }
 });
 
-app.post('/message', (req, res) => {
+/*app.post('/message', (req, res) => {
     const { login, pasword, message, idSalon } = req.body;
     const hashedPassword = bcrypt.hashSync(pasword, parseInt(ValeurHash)); // Hash du mot de passe avec bcrypt
     connection.query('SELECT id,login,idSalon FROM User,AssociationSalon WHERE login = ? AND pasword = ?', [login, hashedPassword], (err, results) => {
@@ -193,7 +193,7 @@ app.post('/pull-message', (req, res) => {
             });
         }
     });
-});
+});*/
 
 app.listen(9000, () => { //express écoute sur le port 3000 et affiche un message dans la console
     console.log('server runing')
@@ -216,6 +216,16 @@ server.on('connection', (socket) => {
         // En WS moderne, 'data' est un Buffer, il faut le convertir en string
         const message = data.toString();
         console.log(`Reçu : ${message}`);
+        const {userId, text, idSalon} = JSON.parse(message);
+        connection.query('INSERT INTO Message (`idSalon`, `idUser`, `text`) VALUES (?,?,?)', [idSalon, userId, text], (err, results) => {
+            if (err) {
+                console.error('Erreur lors de l\'insertion du message dans la base de données :', err);
+                return;
+            }
+            else {
+                console.log('Message inséré avec succès, ID du message :', results.insertId);
+            }
+        });
 
         for (var i = 0; i < clients.length; i++) {
             clients[i].send(`Serveur : ${message}`);
@@ -223,7 +233,7 @@ server.on('connection', (socket) => {
         //socket.send('Server: ${message}');
     });
 
-    socket.on('rejoindre-Salon', (salondID) => {
+    /*socket.on('rejoindre-Salon', (salondID) => {
         console.log(`Client ${socket.id} a rejoint le salon : ${salondID.nom}`);
         socket.join(salondID); // Rejoindre le salon
         socket.emit('salon-rejoint', `Vous avez rejoint le salon : ${salondID.nom}`); // Confirmer au client qu'il a rejoint le salon
@@ -235,7 +245,7 @@ server.on('connection', (socket) => {
         socket.leave(salondID); // Quitter le salon
         socket.emit('salon-quitte', `Vous avez quitté le salon : ${salondID.nom}`); // Confirmer au client qu'il a quitté le salon
         socket.to(salondID).emit('message', `${socket.nom} a quitté le salon : ${salondID.nom}`); // Informer les autres membres du salon
-    })
+    })*/
 
     //Retire le socket du tableau de clients
     socket.on('close', () => {
@@ -244,6 +254,10 @@ server.on('connection', (socket) => {
         if (index !== -1) {
             clients.splice(index, 1);
         }
+    });
+
+    socket.on('error', (err) => {
+        console.error('Erreur Socket:', err);
     });
 
 });
