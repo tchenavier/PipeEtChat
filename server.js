@@ -137,69 +137,6 @@ app.post('/connexion', (req, res) => {
     }
 });
 
-/*app.post('/message', (req, res) => {
-    const { login, pasword, message, idSalon } = req.body;
-    const hashedPassword = bcrypt.hashSync(pasword, parseInt(ValeurHash)); // Hash du mot de passe avec bcrypt
-    connection.query('SELECT id,login,idSalon FROM User,AssociationSalon WHERE login = ? AND pasword = ?', [login, hashedPassword], (err, results) => {
-        if (err) {
-            console.error('Erreur lors de la vérification des identifiants :', err);
-            res.status(500).json({ message: 'Erreur serveur' });
-            return;
-        }
-        else if (results.length === 0) {
-            res.status(401).json({ message: 'Identifiants invalides' });
-            return;
-        }
-        else {
-            connection.query('INSERT INTO Message (`idSalon`, `idUser`, `text`) VALUES (?,?,?)', [idSalon, results[0].id, message], (err, results) => {
-                if (err) {
-                    console.error('Erreur lors de l\'insertion du message dans la base de données :', err);
-                    res.status(500).json({ message: 'Erreur serveur' });
-                    return;
-                }
-                else if (results.length === 0) {
-                    res.status(401).json({ message: 'Identifiants invalides' });
-                    return;
-                }
-                else {
-                    console.log('Message inséré avec succès, ID du message :', results.insertId);
-                    res.status(200).json({ message: 'Message envoyé !', messageId: results.insertId });
-                    return;
-                }
-            });
-        }
-    });
-});
-
-app.post('/pull-message', (req, res) => {
-    const { login, pasword, message, idSalon } = req.body;
-    connection.query('SELECT id,login FROM User WHERE login = ? AND pasword = ?', [login, pasword], (err, results) => {
-        if (err) {
-            console.error('Erreur lors de la vérification des identifiants :', err);
-            res.status(500).json({ message: 'Erreur serveur' });
-            return;
-        }
-        else if (results.length === 0) {
-            res.status(401).json({ message: 'Identifiants invalides' });
-            return;
-        } else {
-            connection.query('SELECT text FROM Message WHERE idSalon = ?', [idSalon], (err, results) => {
-                if (err) {
-                    console.error('Erreur lors de la récupération des messages :', err);
-                    res.status(500).json({ message: 'Erreur serveur' });
-                    return;
-                } else if (results.length === 0) {
-                    res.status(401).json({ message: 'Identifiants invalides' });
-                    return;
-                } else {
-                    res.status(200).json({ messages: results });
-                    return;
-                }
-            });
-        }
-    });
-});*/
-
 app.listen(9000, () => { //express écoute sur le port 3000 et affiche un message dans la console
     console.log('server runing')
 });  //Le poind virgule c'est juste pour dire la fin de la fonction
@@ -216,15 +153,28 @@ var clients = [];
 server.on('connection', (socket) => {
     console.log('Clien connecte');
     clients.push(socket);
+    
+        //Pour récupérer les ancien messages du salon
+        connection.query('SELECT Message.text, User.login, Message.idSalon FROM Message,User WHERE Message.idUser = User.id AND idSalon = ? ORDER BY Message.id DESC LIMIT 100', [idSalon], (err, results) => {
+        if (err) {
+            console.error('Erreur historique SQL :', err);
+        } else {
+            // On inverse les résultats pour les envoyer dans l'ordre chronologique
+            const history = results.reverse();
+            
+            // On envoie l'historique uniquement au client qui vient de se connecter
+            socket.send(JSON.stringify({
+                type: 'history',
+                data: history
+            }));
+        }
+    });
 
     socket.on('message', (data) => {
-
 
         try { //pour éviter que le serveur s'arrête en cas de message jason mal formé
             const message = data.toString();
             const messageData = JSON.parse(rawMessage);
-
-
 
             // En WS moderne, 'data' est un Buffer, il faut le convertir en string
             console.log(`Reçu : ${message}`);
@@ -255,19 +205,6 @@ server.on('connection', (socket) => {
                 }
                 return;
             });
-            /*socket.on('rejoindre-Salon', (salondID) => {
-                console.log(`Client ${socket.id} a rejoint le salon : ${salondID.nom}`);
-                socket.join(salondID); // Rejoindre le salon
-                socket.emit('salon-rejoint', `Vous avez rejoint le salon : ${salondID.nom}`); // Confirmer au client qu'il a rejoint le salon
-                socket.to(salondID).emit('message', `${socket.nom} a rejoint le salon : ${salondID.nom}`); // Informer les autres membres du salon
-            })
-        
-            socket.on('quiter-salon', (data) => {
-                console.log(`Client ${socket.id} a quitté le salon : ${salondID.nom}`);
-                socket.leave(salondID); // Quitter le salon
-                socket.emit('salon-quitte', `Vous avez quitté le salon : ${salondID.nom}`); // Confirmer au client qu'il a quitté le salon
-                socket.to(salondID).emit('message', `${socket.nom} a quitté le salon : ${salondID.nom}`); // Informer les autres membres du salon
-            })*/
          // deuxième partie du try
             } catch (error) {
             console.error('Erreur de formatage JSON reçu :', error);
