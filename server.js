@@ -56,7 +56,7 @@ app.post('/register', (req, res) => { //enregistrement des utilisateur
             return res.status(400).json({ error: '' });
         }
         else {
-            connection.query('SELECT id,login FROM User WHERE login = ? ', [login], (err, results) => {//Pour ne renvoyer que l'id le login et l'id du role
+            connection.query('SELECT id,login FROM User WHERE login = ? ', [login], (err, results) => {//Pour ne renvoyer que l'id le login
                 if (err) {
                     console.error('Erreur lors de la vérification des identifiants :', err);
                     res.status(500).json({ message: 'Erreur serveur' });
@@ -115,18 +115,23 @@ app.post('/connexion', (req, res) => {
         }
         else {
             connection.query('SELECT id,login FROM User WHERE login = ? AND pasword = ?', [login, hashedPassword], (err, results) => {//Pour ne renvoyer que l'id le login et l'id du role
-                if (err) {
-                    console.error('Erreur lors de la vérification des identifiants :', err);
-                    res.status(500).json({ message: 'Erreur serveur' });
-                    return;
-                }
-                if (results.length === 0) {
+                if (err || results.length === 0) {
                     res.status(401).json({ message: 'Identifiants invalides' });
                     return;
                 }
-                // Identifiants valides 
-                //renvoi les informations du user
-                res.status(202).json({ user: results[0] });
+
+                const user = results[0];
+                const match = bcrypt.compareSync(pasword, user.pasword);
+
+                if (match) {
+                    // Identifiants valides 
+                    //renvoi les informations du user
+                    res.status(202).json({ user: { id: user.id, login: user.login } });
+                    return;
+                } else {
+                    res.status(401).json({ message: 'Identifiants invalides' });
+                    return;
+                }
             });
         }
     }
@@ -216,7 +221,7 @@ server.on('connection', (socket) => {
         // En WS moderne, 'data' est un Buffer, il faut le convertir en string
         const message = data.toString();
         console.log(`Reçu : ${message}`);
-        const {userId, text, idSalon} = JSON.parse(message);
+        const { userId, text, idSalon } = JSON.parse(message);
         connection.query('INSERT INTO Message (`idSalon`, `idUser`, `text`) VALUES (?,?,?)', [idSalon, userId, text], (err, results) => {
             if (err) {
                 console.error('Erreur lors de l\'insertion du message dans la base de données :', err);
@@ -224,6 +229,10 @@ server.on('connection', (socket) => {
             }
             else {
                 console.log('Message inséré avec succès, ID du message :', results.insertId);
+                const broadcastMessage = JSON.stringify({ message: text, idSalon: idSalon, userId: userId });
+                for (var i = 0; i < clients.length; i++) {
+                    clients[i].send(broadcastMessage);
+                }
             }
         });
 
