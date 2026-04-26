@@ -214,48 +214,66 @@ const server = new WebSocketServer({
 var clients = [];
 
 server.on('connection', (socket) => {
-    console.log('Clien connected');
+    console.log('Clien connecte');
     clients.push(socket);
 
     socket.on('message', (data) => {
-        // En WS moderne, 'data' est un Buffer, il faut le convertir en string
-        const message = data.toString();
-        console.log(`Reçu : ${message}`);
-        const { userId, text, idSalon } = JSON.parse(message);
-        connection.query('INSERT INTO Message (`idSalon`, `idUser`, `text`) VALUES (?,?,?)', [idSalon, userId, text], (err, results) => {
-            if (err) {
-                console.error('Erreur lors de l\'insertion du message dans la base de données :', err);
-                return;
-            }
-            else {
-                console.log('Message inséré avec succès, ID du message :', results.insertId);
-                const broadcastMessage = JSON.stringify({ message: text, idSalon: idSalon, userId: userId });
+
+
+        try { //pour éviter que le serveur s'arrête en cas de message jason mal formé
+            const message = data.toString();
+            const messageData = JSON.parse(rawMessage);
+
+
+
+            // En WS moderne, 'data' est un Buffer, il faut le convertir en string
+            console.log(`Reçu : ${message}`);
+            const { userId, text, idSalon } = JSON.parse(message);
+
+            connection.query('INSERT INTO Message (`idSalon`, `idUser`, `text`) VALUES (?,?,?)', [idSalon, userId, text], (err, results) => {
+                if (err) {
+                    console.error('Erreur lors de l\'insertion du message dans la base de données :', err);
+                    socket.send(JSON.stringify({ type: 'error', message: 'Erreur lors de la sauvegarde.' }));
+                    return;
+                }
+                else {
+                    console.log('Message inséré avec succès, ID du message :', results.insertId);
+                    const broadcastMessage = JSON.stringify({ message: text, idSalon: idSalon, userId: userId });
+                    for (var i = 0; i < clients.length; i++) {
+                        clients[i].send(broadcastMessage);
+                    }
+                }
+                //preparation du message
+                const broadcastMessage = JSON.stringify({
+                    message: text,
+                    idSalon: idSalon,
+                    userId: userId
+                });
+                //envoi du message a tous les clients connecter
                 for (var i = 0; i < clients.length; i++) {
                     clients[i].send(broadcastMessage);
                 }
-            }
-        });
-
-        for (var i = 0; i < clients.length; i++) {
-            clients[i].send(`Serveur : ${message}`);
+                return;
+            });
+            /*socket.on('rejoindre-Salon', (salondID) => {
+                console.log(`Client ${socket.id} a rejoint le salon : ${salondID.nom}`);
+                socket.join(salondID); // Rejoindre le salon
+                socket.emit('salon-rejoint', `Vous avez rejoint le salon : ${salondID.nom}`); // Confirmer au client qu'il a rejoint le salon
+                socket.to(salondID).emit('message', `${socket.nom} a rejoint le salon : ${salondID.nom}`); // Informer les autres membres du salon
+            })
+        
+            socket.on('quiter-salon', (data) => {
+                console.log(`Client ${socket.id} a quitté le salon : ${salondID.nom}`);
+                socket.leave(salondID); // Quitter le salon
+                socket.emit('salon-quitte', `Vous avez quitté le salon : ${salondID.nom}`); // Confirmer au client qu'il a quitté le salon
+                socket.to(salondID).emit('message', `${socket.nom} a quitté le salon : ${salondID.nom}`); // Informer les autres membres du salon
+            })*/
+         // deuxième partie du try
+            } catch (error) {
+            console.error('Erreur de formatage JSON reçu :', error);
+            socket.send(JSON.stringify({ type: 'error', message: 'Format JSON invalide.' }));
         }
-        //socket.send('Server: ${message}');
     });
-
-    /*socket.on('rejoindre-Salon', (salondID) => {
-        console.log(`Client ${socket.id} a rejoint le salon : ${salondID.nom}`);
-        socket.join(salondID); // Rejoindre le salon
-        socket.emit('salon-rejoint', `Vous avez rejoint le salon : ${salondID.nom}`); // Confirmer au client qu'il a rejoint le salon
-        socket.to(salondID).emit('message', `${socket.nom} a rejoint le salon : ${salondID.nom}`); // Informer les autres membres du salon
-    })
-
-    socket.on('quiter-salon', (data) => {
-        console.log(`Client ${socket.id} a quitté le salon : ${salondID.nom}`);
-        socket.leave(salondID); // Quitter le salon
-        socket.emit('salon-quitte', `Vous avez quitté le salon : ${salondID.nom}`); // Confirmer au client qu'il a quitté le salon
-        socket.to(salondID).emit('message', `${socket.nom} a quitté le salon : ${salondID.nom}`); // Informer les autres membres du salon
-    })*/
-
     //Retire le socket du tableau de clients
     socket.on('close', () => {
         console.log('Client disconnected');
