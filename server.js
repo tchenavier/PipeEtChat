@@ -48,10 +48,10 @@ app.post('/register', (req, res) => { //enregistrement des utilisateur
         const loginLength = login.length;
         const paswordLength = pasword.length;
 
-        // longueur minimale et maximale
-        if (loginLength <= 0 || paswordLength <= 0) {
+        // longueur minimal 
+        if (loginLength <= 3 || paswordLength <= 3) {
             return res.status(400).json({ error: '' });
-        }
+        }//longueur maximale
         else if (loginLength > 25 || paswordLength > 25) {
             return res.status(400).json({ error: '' });
         }
